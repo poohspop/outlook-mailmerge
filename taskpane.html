@@ -283,7 +283,7 @@
     // ── STATE ──
     let currentStep=1,data=[],columns=[],previewIdx=0,quill=null,editorMode='visual',isSending=false,isOfficeReady=false;
 
-    if(typeof Office!=='undefined'){Office.onReady(function(info){isOfficeReady=true;console.log('Office.js ready:',info.host)})}
+    if(typeof Office!=='undefined'){Office.onReady(function(info){isOfficeReady=true;console.log('Office.js ready:',info.host);document.getElementById('statusText').textContent='Connected to '+info.host+' | API: '+(Office.context.mailbox.displayNewMessageFormAsync?'1.9+':Office.context.mailbox.displayNewMessageForm?'1.6+':'basic')})}
 
     // ── STEP NAVIGATION ──
     function goToStep(n){
@@ -439,14 +439,34 @@
     }
 
     function sendViaOutlook(to,subject,htmlBody,cc,bcc,importance,readReceipt){
-      return new Promise((resolve,reject)=>{
-        try{
+      return new Promise(function(resolve,reject){
+        // Try displayNewMessageFormAsync first (Mailbox 1.9+)
+        if(Office.context.mailbox.displayNewMessageFormAsync){
           var params={toRecipients:[to],subject:subject,htmlBody:htmlBody};
-          if(cc){params.ccRecipients=cc.split(/[,;]/).map(function(e){return e.trim()}).filter(Boolean)}
-          if(bcc){params.bccRecipients=bcc.split(/[,;]/).map(function(e){return e.trim()}).filter(Boolean)}
-          Office.context.mailbox.displayNewMessageForm(params);
+          if(cc)params.ccRecipients=cc.split(/[,;]/).map(function(e){return e.trim()}).filter(Boolean);
+          if(bcc)params.bccRecipients=bcc.split(/[,;]/).map(function(e){return e.trim()}).filter(Boolean);
+          Office.context.mailbox.displayNewMessageFormAsync(params,function(result){
+            if(result.status===Office.AsyncResultStatus.Failed){reject(new Error(result.error.message))}
+            else{setTimeout(resolve,300)}
+          });
+        }
+        // Try displayNewMessageForm (Mailbox 1.6+)
+        else if(Office.context.mailbox.displayNewMessageForm){
+          var params2={toRecipients:[to],subject:subject,htmlBody:htmlBody};
+          if(cc)params2.ccRecipients=cc.split(/[,;]/).map(function(e){return e.trim()}).filter(Boolean);
+          if(bcc)params2.bccRecipients=bcc.split(/[,;]/).map(function(e){return e.trim()}).filter(Boolean);
+          Office.context.mailbox.displayNewMessageForm(params2);
           setTimeout(resolve,500);
-        }catch(err){reject(err)}
+        }
+        // Fallback: open mailto link
+        else{
+          var mailto='mailto:'+encodeURIComponent(to)+'?subject='+encodeURIComponent(subject);
+          if(cc)mailto+='&cc='+encodeURIComponent(cc);
+          if(bcc)mailto+='&bcc='+encodeURIComponent(bcc);
+          mailto+='&body='+encodeURIComponent(htmlBody.replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim());
+          window.open(mailto,'_blank');
+          setTimeout(resolve,500);
+        }
       });
     }
 
@@ -460,4 +480,3 @@
   </script>
 </body>
 </html>
- 
