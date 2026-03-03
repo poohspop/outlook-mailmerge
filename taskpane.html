@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mail Merge for Outlook</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+  <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet" />
+  <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+    :root {
+      --bg:#f7f7f5;--surface:#fff;--surface-alt:#f0efeb;--border:#e2e0db;
+      --border-focus:#0066cc;--text:#1a1a1a;--text-muted:#6b6b6b;
+      --accent:#0066cc;--accent-hover:#0052a3;--accent-light:#e6f0ff;
+      --success:#16803c;--success-light:#dcfce7;--warning:#c2410c;
+      --warning-light:#fff7ed;--error:#dc2626;--error-light:#fef2f2;
+      --radius:6px;--shadow-sm:0 1px 2px rgba(0,0,0,.06);
+    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.5;min-height:100vh}
+    .header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100}
+    .header-icon{width:28px;height:28px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .header-icon svg{width:16px;height:16px;fill:#fff}
+    .header h1{font-size:15px;font-weight:600;letter-spacing:-.01em}
+    .steps-nav{display:flex;background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px}
+    .step-tab{flex:1;padding:10px 4px;text-align:center;font-size:11px;font-weight:500;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;user-select:none}
+    .step-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+    .step-tab.completed{color:var(--success)}
+    .step-num{display:inline-flex;width:18px;height:18px;border-radius:50%;align-items:center;justify-content:center;font-size:10px;font-weight:600;background:var(--surface-alt);color:var(--text-muted);margin-right:4px;vertical-align:middle}
+    .step-tab.active .step-num{background:var(--accent);color:#fff}
+    .step-tab.completed .step-num{background:var(--success);color:#fff}
+    .panel{display:none;padding:16px;animation:fadeIn .2s ease}
+    .panel.active{display:block}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px;box-shadow:var(--shadow-sm)}
+    .card-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);margin-bottom:10px}
+    label{display:block;font-size:12px;font-weight:500;margin-bottom:4px;color:var(--text)}
+    input[type="text"],input[type="email"],select,textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius);font-family:inherit;font-size:13px;color:var(--text);background:var(--surface);transition:border-color .15s;outline:none}
+    input:focus,select:focus,textarea:focus{border-color:var(--border-focus);box-shadow:0 0 0 2px var(--accent-light)}
+    textarea{resize:vertical;min-height:60px}
+    .form-group{margin-bottom:12px}
+    .form-row{display:flex;gap:8px}
+    .form-row>*{flex:1}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 14px;border:none;border-radius:var(--radius);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s}
+    .btn-primary{background:var(--accent);color:#fff}
+    .btn-primary:hover{background:var(--accent-hover)}
+    .btn-primary:disabled{background:#b0b0b0;cursor:not-allowed}
+    .btn-secondary{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+    .btn-secondary:hover{background:var(--surface-alt)}
+    .btn-sm{padding:5px 10px;font-size:12px}
+    .btn-block{width:100%}
+    .upload-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:24px 16px;text-align:center;cursor:pointer;transition:all .15s;background:var(--surface)}
+    .upload-zone:hover,.upload-zone.dragover{border-color:var(--accent);background:var(--accent-light)}
+    .upload-zone svg{width:32px;height:32px;margin-bottom:8px;opacity:.4}
+    .upload-zone p{font-size:13px;color:var(--text-muted)}
+    .upload-zone .hint{font-size:11px;color:var(--text-muted);margin-top:4px;opacity:.7}
+    #fileInput{display:none}
+    .data-preview-wrap{overflow-x:auto;margin-top:10px;border:1px solid var(--border);border-radius:var(--radius);max-height:200px}
+    .data-preview{width:100%;border-collapse:collapse;font-size:11px;font-family:'JetBrains Mono',monospace}
+    .data-preview th{background:var(--surface-alt);padding:6px 10px;text-align:left;font-weight:600;white-space:nowrap;border-bottom:1px solid var(--border);position:sticky;top:0}
+    .data-preview td{padding:5px 10px;border-bottom:1px solid var(--border);white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis}
+    .data-preview tr:last-child td{border-bottom:none}
+    .data-preview tr:hover td{background:var(--accent-light)}
+    .data-stats{display:flex;gap:12px;margin-top:8px;font-size:12px;color:var(--text-muted)}
+    .data-stats strong{color:var(--text);font-weight:600}
+    .field-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+    .field-chip{display:inline-flex;align-items:center;padding:4px 10px;background:var(--accent-light);color:var(--accent);border:1px solid #b3d4ff;border-radius:20px;font-size:11px;font-weight:500;font-family:'JetBrains Mono',monospace;cursor:pointer;transition:all .15s;user-select:none}
+    .field-chip:hover{background:var(--accent);color:#fff}
+    .editor-wrapper{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:#fff}
+    .editor-wrapper .ql-toolbar{border:none;border-bottom:1px solid var(--border);background:var(--surface-alt);padding:6px 8px}
+    .editor-wrapper .ql-container{border:none;font-family:'DM Sans',sans-serif;font-size:13px;min-height:200px}
+    .editor-wrapper .ql-editor{min-height:200px;padding:12px}
+    .source-editor{width:100%;min-height:200px;padding:12px;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.6;border:1px solid var(--border);border-radius:var(--radius);background:#1e1e2e;color:#cdd6f4;resize:vertical}
+    .editor-toggle{display:flex;gap:0;margin-bottom:8px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;width:fit-content}
+    .editor-toggle button{padding:5px 12px;font-size:11px;font-weight:500;font-family:inherit;border:none;background:var(--surface);color:var(--text-muted);cursor:pointer;transition:all .15s}
+    .editor-toggle button.active{background:var(--accent);color:#fff}
+    .preview-frame{border:1px solid var(--border);border-radius:var(--radius);background:#fff;min-height:200px;padding:16px}
+    .preview-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+    .preview-nav span{font-size:12px;color:var(--text-muted);font-weight:500}
+    .status-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;z-index:100}
+    .nav-buttons{display:flex;gap:8px}
+    .progress-bar{height:4px;background:var(--surface-alt);border-radius:2px;overflow:hidden;margin:10px 0}
+    .progress-fill{height:100%;background:var(--accent);transition:width .3s ease;border-radius:2px}
+    .send-log{max-height:200px;overflow-y:auto;font-size:11px;font-family:'JetBrains Mono',monospace;background:#1e1e2e;color:#cdd6f4;border-radius:var(--radius);padding:10px;margin-top:8px}
+    .send-log .log-ok{color:#a6e3a1}
+    .send-log .log-err{color:#f38ba8}
+    .send-log .log-info{color:#89b4fa}
+    .alert{padding:10px 12px;border-radius:var(--radius);font-size:12px;margin-bottom:10px;display:flex;align-items:flex-start;gap:8px}
+    .alert-info{background:var(--accent-light);color:var(--accent)}
+    .alert-success{background:var(--success-light);color:var(--success)}
+    .alert-warning{background:var(--warning-light);color:var(--warning)}
+    .alert-error{background:var(--error-light);color:var(--error)}
+    .checkbox-row{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+    .checkbox-row input[type="checkbox"]{width:14px;height:14px;accent-color:var(--accent)}
+    .checkbox-row label{margin:0;font-size:12px;cursor:pointer}
+    .main-content{padding-bottom:60px}
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:#c0c0c0;border-radius:3px}
+    .delay-slider{display:flex;align-items:center;gap:8px}
+    .delay-slider input[type="range"]{flex:1;accent-color:var(--accent)}
+    .delay-slider .delay-val{font-family:'JetBrains Mono',monospace;font-size:12px;min-width:30px;text-align:right}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-icon">
+      <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+    </div>
+    <h1>Mail Merge</h1>
+  </div>
+  <div class="steps-nav">
+    <div class="step-tab active" data-step="1" onclick="goToStep(1)"><span class="step-num">1</span>Data</div>
+    <div class="step-tab" data-step="2" onclick="goToStep(2)"><span class="step-num">2</span>Compose</div>
+    <div class="step-tab" data-step="3" onclick="goToStep(3)"><span class="step-num">3</span>Preview</div>
+    <div class="step-tab" data-step="4" onclick="goToStep(4)"><span class="step-num">4</span>Send</div>
+  </div>
+  <div class="main-content">
+    <!-- STEP 1: DATA SOURCE -->
+    <div class="panel active" id="panel-1">
+      <div class="card">
+        <div class="card-title">Upload Data Source</div>
+        <div class="upload-zone" id="uploadZone">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+          <p>Drop a file here or click to browse</p>
+          <span class="hint">CSV, XLSX, XLS, TSV</span>
+        </div>
+        <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.tsv" />
+      </div>
+      <div id="dataLoaded" style="display:none">
+        <div class="card">
+          <div class="card-title">Data Preview</div>
+          <div class="data-stats" id="dataStats"></div>
+          <div class="data-preview-wrap" id="dataPreviewWrap"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Column Configuration</div>
+          <div class="form-group">
+            <label>Email Address Column</label>
+            <select id="emailCol"></select>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>First Name (optional)</label>
+              <select id="firstNameCol"><option value="">-- none --</option></select>
+            </div>
+            <div class="form-group">
+              <label>Last Name (optional)</label>
+              <select id="lastNameCol"><option value="">-- none --</option></select>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Available Merge Fields</div>
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:6px">Click a field to copy it. Use these in Step 2.</p>
+          <div class="field-chips" id="fieldChips"></div>
+        </div>
+      </div>
+    </div>
+    <!-- STEP 2: COMPOSE -->
+    <div class="panel" id="panel-2">
+      <div class="card">
+        <div class="card-title">Message Details</div>
+        <div class="form-group">
+          <label>From Name (display name)</label>
+          <input type="text" id="fromName" placeholder="e.g. Andy Crim" />
+        </div>
+        <div class="form-group">
+          <label>Subject Line <span style="color:var(--text-muted);font-weight:400">(merge fields supported)</span></label>
+          <input type="text" id="subjectLine" placeholder="e.g. Hello {{FirstName}}, your report is ready" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>CC <span style="color:var(--text-muted);font-weight:400">(optional)</span></label>
+            <input type="text" id="ccField" placeholder="email@example.com" />
+          </div>
+          <div class="form-group">
+            <label>BCC <span style="color:var(--text-muted);font-weight:400">(optional)</span></label>
+            <input type="text" id="bccField" placeholder="email@example.com" />
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Email Body</div>
+        <div class="editor-toggle">
+          <button class="active" id="btnVisual" onclick="setEditorMode('visual')">Visual</button>
+          <button id="btnSource" onclick="setEditorMode('source')">HTML Source</button>
+        </div>
+        <div id="visualEditor">
+          <div class="alert alert-info" style="margin-bottom:8px">Click a merge field below to insert it at the cursor.</div>
+          <div class="field-chips" id="editorFieldChips"></div>
+          <div style="margin-top:8px">
+            <div class="editor-wrapper"><div id="quillEditor"></div></div>
+          </div>
+        </div>
+        <div id="sourceEditor" style="display:none">
+          <div class="alert alert-info" style="margin-bottom:8px">Write raw HTML. Use <code>{{FieldName}}</code> for merge fields.</div>
+          <textarea class="source-editor" id="htmlSource" placeholder="<p>Dear {{FirstName}},</p>"></textarea>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Options</div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="optTrackOpens" />
+          <label for="optTrackOpens">Request read receipts</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="optHighImportance" />
+          <label for="optHighImportance">Mark as high importance</label>
+        </div>
+        <div class="form-group" style="margin-top:8px">
+          <label>Delay between sends (seconds)</label>
+          <div class="delay-slider">
+            <input type="range" id="sendDelay" min="0" max="10" value="2" oninput="document.getElementById('delayVal').textContent=this.value+'s'" />
+            <span class="delay-val" id="delayVal">2s</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- STEP 3: PREVIEW -->
+    <div class="panel" id="panel-3">
+      <div class="card">
+        <div class="card-title">Merged Preview</div>
+        <div class="preview-nav">
+          <button class="btn btn-secondary btn-sm" onclick="previewPrev()">&#8592; Prev</button>
+          <span id="previewIndex">Record 1 of 0</span>
+          <button class="btn btn-secondary btn-sm" onclick="previewNext()">Next &#8594;</button>
+        </div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:11px;color:var(--text-muted)">TO</label>
+          <div id="previewTo" style="font-size:13px;font-weight:500"></div>
+        </div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:11px;color:var(--text-muted)">SUBJECT</label>
+          <div id="previewSubject" style="font-size:13px;font-weight:500"></div>
+        </div>
+        <div class="preview-frame" id="previewBody"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Send Summary</div>
+        <div id="sendSummary"></div>
+      </div>
+    </div>
+    <!-- STEP 4: SEND -->
+    <div class="panel" id="panel-4">
+      <div class="card">
+        <div class="card-title">Send Mail Merge</div>
+        <div class="alert alert-warning" id="sendWarning">This sends individual emails to each recipient. Review your preview before proceeding.</div>
+        <div id="preSend">
+          <div id="finalSummary" style="font-size:13px;margin-bottom:12px"></div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="confirmSend" onchange="document.getElementById('btnSend').disabled=!this.checked" />
+            <label for="confirmSend">I have reviewed the preview and confirm sending</label>
+          </div>
+          <button class="btn btn-primary btn-block" id="btnSend" disabled onclick="startSending()">Send All Emails</button>
+        </div>
+        <div id="sendProgress" style="display:none">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+            <span id="progressLabel">Sending...</span>
+            <span id="progressCount">0 / 0</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+          <div class="send-log" id="sendLog"></div>
+          <div id="sendComplete" style="display:none;margin-top:12px">
+            <div class="alert alert-success" id="sendResult"></div>
+            <button class="btn btn-secondary btn-block" onclick="resetAll()">Start New Merge</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="status-bar">
+    <span id="statusText" style="font-size:11px;color:var(--text-muted)">Load a data source to begin.</span>
+    <div class="nav-buttons">
+      <button class="btn btn-secondary btn-sm" id="btnPrev" onclick="prevStep()" style="display:none">Back</button>
+      <button class="btn btn-primary btn-sm" id="btnNext" onclick="nextStep()">Next</button>
+    </div>
+  </div>
+  <script>
+    // ── STATE ──
+    let currentStep=1,data=[],columns=[],previewIdx=0,quill=null,editorMode='visual',isSending=false,isOfficeReady=false;
+
+    if(typeof Office!=='undefined'){Office.onReady(function(info){isOfficeReady=true;console.log('Office.js ready:',info.host)})}
+
+    // ── STEP NAVIGATION ──
+    function goToStep(n){
+      if(n<1||n>4)return;
+      if(n>1&&data.length===0)return;
+      if(n===3)buildPreview();
+      if(n===4)buildFinalSummary();
+      currentStep=n;
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      document.getElementById('panel-'+n).classList.add('active');
+      document.querySelectorAll('.step-tab').forEach(t=>{
+        const s=parseInt(t.dataset.step);
+        t.classList.remove('active');
+        if(s===n)t.classList.add('active');
+        if(s<n)t.classList.add('completed');else t.classList.remove('completed');
+      });
+      document.getElementById('btnPrev').style.display=n>1?'':'none';
+      document.getElementById('btnNext').style.display=n<4?'':'none';
+      updateStatus();
+    }
+    function nextStep(){goToStep(currentStep+1)}
+    function prevStep(){goToStep(currentStep-1)}
+    function updateStatus(){
+      const msgs={1:data.length?data.length+' records loaded.':'Load a data source to begin.',2:'Compose your email template.',3:'Review merged emails before sending.',4:isSending?'Sending in progress...':'Ready to send.'};
+      document.getElementById('statusText').textContent=msgs[currentStep];
+    }
+
+    // ── FILE UPLOAD ──
+    const uploadZone=document.getElementById('uploadZone'),fileInput=document.getElementById('fileInput');
+    uploadZone.addEventListener('click',()=>fileInput.click());
+    uploadZone.addEventListener('dragover',e=>{e.preventDefault();uploadZone.classList.add('dragover')});
+    uploadZone.addEventListener('dragleave',()=>uploadZone.classList.remove('dragover'));
+    uploadZone.addEventListener('drop',e=>{e.preventDefault();uploadZone.classList.remove('dragover');if(e.dataTransfer.files.length)handleFile(e.dataTransfer.files[0])});
+    fileInput.addEventListener('change',()=>{if(fileInput.files.length)handleFile(fileInput.files[0])});
+
+    function handleFile(file){
+      const ext=file.name.split('.').pop().toLowerCase();
+      if(ext==='csv'||ext==='tsv'){
+        Papa.parse(file,{header:true,skipEmptyLines:true,complete:r=>{columns=r.meta.fields||[];data=r.data;onDataLoaded(file.name)},error:e=>alert('Parse error: '+e.message)});
+      }else if(ext==='xlsx'||ext==='xls'){
+        const reader=new FileReader();
+        reader.onload=e=>{const wb=XLSX.read(e.target.result,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];const json=XLSX.utils.sheet_to_json(ws,{defval:''});if(!json.length){alert('No data found.');return}columns=Object.keys(json[0]);data=json;onDataLoaded(file.name)};
+        reader.readAsArrayBuffer(file);
+      }else{alert('Unsupported file type. Use CSV, TSV, XLSX, or XLS.')}
+    }
+
+    function onDataLoaded(fileName){
+      uploadZone.innerHTML='<p style="color:var(--success);font-weight:500">'+escHtml(fileName)+' loaded</p><span class="hint">Click to replace</span>';
+      document.getElementById('dataStats').innerHTML='<span><strong>'+data.length+'</strong> rows</span><span><strong>'+columns.length+'</strong> columns</span>';
+      let html='<table class="data-preview"><thead><tr>';
+      columns.forEach(c=>html+='<th>'+escHtml(c)+'</th>');
+      html+='</tr></thead><tbody>';
+      data.slice(0,5).forEach(row=>{html+='<tr>';columns.forEach(c=>html+='<td>'+escHtml(String(row[c]||''))+'</td>');html+='</tr>'});
+      if(data.length>5){html+='<tr>';columns.forEach(()=>html+='<td style="color:var(--text-muted);text-align:center">...</td>');html+='</tr>'}
+      html+='</tbody></table>';
+      document.getElementById('dataPreviewWrap').innerHTML=html;
+      populateSelect('emailCol',columns,guessColumn(columns,['email','e-mail','emailaddress','email_address','mail']));
+      populateSelect('firstNameCol',columns,guessColumn(columns,['firstname','first_name','first','fname','given']),true);
+      populateSelect('lastNameCol',columns,guessColumn(columns,['lastname','last_name','last','lname','surname','family']),true);
+      buildFieldChips('fieldChips');buildFieldChips('editorFieldChips',true);
+      document.getElementById('dataLoaded').style.display='';
+      updateStatus();
+    }
+
+    function populateSelect(id,cols,defaultVal,includeNone){
+      const sel=document.getElementById(id);
+      sel.innerHTML=includeNone?'<option value="">-- none --</option>':'';
+      cols.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;if(c===defaultVal)o.selected=true;sel.appendChild(o)});
+    }
+    function guessColumn(cols,hints){for(const h of hints){const f=cols.find(c=>c.toLowerCase().replace(/[^a-z]/g,'')===h);if(f)return f}return cols[0]||''}
+
+    function buildFieldChips(containerId,insertMode){
+      const el=document.getElementById(containerId);el.innerHTML='';
+      columns.forEach(c=>{
+        const chip=document.createElement('span');chip.className='field-chip';chip.textContent='{{'+c+'}}';
+        chip.title=insertMode?'Insert into editor':'Click to copy';
+        chip.addEventListener('click',()=>{
+          if(insertMode&&editorMode==='visual'&&quill){const r=quill.getSelection(true);quill.insertText(r.index,'{{'+c+'}}');quill.setSelection(r.index+c.length+4)}
+          else if(insertMode&&editorMode==='source'){const ta=document.getElementById('htmlSource');const s=ta.selectionStart;const v=ta.value;ta.value=v.slice(0,s)+'{{'+c+'}}'+v.slice(s);ta.selectionStart=ta.selectionEnd=s+c.length+4;ta.focus()}
+          else{navigator.clipboard.writeText('{{'+c+'}}');chip.style.background='var(--success)';chip.style.color='#fff';chip.style.borderColor='var(--success)';setTimeout(()=>{chip.style.background='';chip.style.color='';chip.style.borderColor=''},600)}
+        });
+        el.appendChild(chip);
+      });
+    }
+
+    // ── QUILL EDITOR ──
+    quill=new Quill('#quillEditor',{theme:'snow',placeholder:'Compose your email here. Use merge fields above to personalize.',modules:{toolbar:[[{'header':[1,2,3,false]}],['bold','italic','underline','strike'],[{'color':[]},{'background':[]}],[{'list':'ordered'},{'list':'bullet'}],[{'align':[]}],['link','image'],['clean']]}});
+
+    function setEditorMode(mode){
+      editorMode=mode;
+      document.getElementById('btnVisual').classList.toggle('active',mode==='visual');
+      document.getElementById('btnSource').classList.toggle('active',mode==='source');
+      if(mode==='source'){document.getElementById('htmlSource').value=quill.root.innerHTML;document.getElementById('visualEditor').style.display='none';document.getElementById('sourceEditor').style.display=''}
+      else{quill.root.innerHTML=document.getElementById('htmlSource').value;document.getElementById('visualEditor').style.display='';document.getElementById('sourceEditor').style.display='none'}
+    }
+    function getEmailHtml(){return editorMode==='source'?document.getElementById('htmlSource').value:quill.root.innerHTML}
+
+    // ── MERGE LOGIC ──
+    function mergeTemplate(tpl,row){return tpl.replace(/\{\{(\w+)\}\}/g,(m,f)=>row.hasOwnProperty(f)?String(row[f]):m)}
+
+    // ── PREVIEW ──
+    function buildPreview(){
+      previewIdx=0;renderPreview();
+      const total=data.length,subj=document.getElementById('subjectLine').value||'(no subject)';
+      document.getElementById('sendSummary').innerHTML='<p style="font-size:13px"><strong>'+total+'</strong> emails will be sent via <strong>'+escHtml(document.getElementById('emailCol').value)+'</strong> column.</p><p style="font-size:12px;color:var(--text-muted);margin-top:4px">Subject: '+escHtml(subj)+'</p>';
+    }
+    function renderPreview(){
+      if(!data.length)return;const row=data[previewIdx],emailCol=document.getElementById('emailCol').value;
+      document.getElementById('previewIndex').textContent='Record '+(previewIdx+1)+' of '+data.length;
+      document.getElementById('previewTo').textContent=row[emailCol]||'(no email)';
+      document.getElementById('previewSubject').textContent=mergeTemplate(document.getElementById('subjectLine').value||'(no subject)',row);
+      document.getElementById('previewBody').innerHTML=mergeTemplate(getEmailHtml(),row);
+    }
+    function previewNext(){if(previewIdx<data.length-1){previewIdx++;renderPreview()}}
+    function previewPrev(){if(previewIdx>0){previewIdx--;renderPreview()}}
+
+    // ── SEND ──
+    function buildFinalSummary(){
+      const emailCol=document.getElementById('emailCol').value,cc=document.getElementById('ccField').value.trim(),bcc=document.getElementById('bccField').value.trim(),delay=document.getElementById('sendDelay').value;
+      let h='<p><strong>Recipients:</strong> '+data.length+' (via '+escHtml(emailCol)+')</p>';
+      if(cc)h+='<p><strong>CC:</strong> '+escHtml(cc)+'</p>';
+      if(bcc)h+='<p><strong>BCC:</strong> '+escHtml(bcc)+'</p>';
+      h+='<p><strong>Delay:</strong> '+delay+'s between sends</p>';
+      document.getElementById('finalSummary').innerHTML=h;
+      document.getElementById('confirmSend').checked=false;document.getElementById('btnSend').disabled=true;
+      document.getElementById('preSend').style.display='';document.getElementById('sendProgress').style.display='none';
+    }
+
+    async function startSending(){
+      isSending=true;
+      document.getElementById('preSend').style.display='none';
+      document.getElementById('sendProgress').style.display='';
+      document.getElementById('sendComplete').style.display='none';
+      const emailCol=document.getElementById('emailCol').value,subject=document.getElementById('subjectLine').value,bodyTpl=getEmailHtml(),cc=document.getElementById('ccField').value.trim(),bcc=document.getElementById('bccField').value.trim(),delay=parseInt(document.getElementById('sendDelay').value)*1000,importance=document.getElementById('optHighImportance').checked,readReceipt=document.getElementById('optTrackOpens').checked;
+      const log=document.getElementById('sendLog');log.innerHTML='';
+      let sent=0,failed=0;
+      for(let i=0;i<data.length;i++){
+        const row=data[i],to=String(row[emailCol]||'').trim(),mergedSubject=mergeTemplate(subject,row),mergedBody=mergeTemplate(bodyTpl,row);
+        document.getElementById('progressCount').textContent=(i+1)+' / '+data.length;
+        document.getElementById('progressFill').style.width=((i+1)/data.length*100)+'%';
+        if(!to||!to.includes('@')){logMsg(log,'SKIP','Row '+(i+1)+': invalid email "'+to+'"','err');failed++;continue}
+        try{
+          if(isOfficeReady){await sendViaOutlook(to,mergedSubject,mergedBody,cc,bcc,importance,readReceipt)}
+          else{await fakeSend(200)}
+          sent++;logMsg(log,'OK','Sent to '+to,'ok');
+        }catch(err){failed++;logMsg(log,'ERR','Failed: '+to+' -- '+err.message,'err')}
+        if(delay>0&&i<data.length-1)await sleep(delay);
+      }
+      document.getElementById('progressLabel').textContent='Complete';
+      document.getElementById('sendResult').innerHTML='<strong>'+sent+'</strong> sent.'+(failed>0?' <strong style="color:var(--error)">'+failed+'</strong> failed.':' No failures.');
+      document.getElementById('sendComplete').style.display='';
+      isSending=false;updateStatus();
+    }
+
+    function sendViaOutlook(to,subject,htmlBody,cc,bcc,importance,readReceipt){
+      return new Promise((resolve,reject)=>{
+        const soap=buildSoap(to,subject,htmlBody,cc,bcc,importance,readReceipt);
+        Office.context.mailbox.makeEwsRequestAsync(soap,result=>{
+          if(result.status===Office.AsyncResultStatus.Succeeded)resolve();
+          else reject(new Error(result.error.message||'EWS failed'));
+        });
+      });
+    }
+
+    function buildSoap(to,subject,htmlBody,cc,bcc,importance,readReceipt){
+      let ccXml='',bccXml='';
+      if(cc)ccXml='<t:CcRecipients>'+cc.split(/[,;]/).map(e=>'<t:Mailbox><t:EmailAddress>'+escXml(e.trim())+'</t:EmailAddress></t:Mailbox>').join('')+'</t:CcRecipients>';
+      if(bcc)bccXml='<t:BccRecipients>'+bcc.split(/[,;]/).map(e=>'<t:Mailbox><t:EmailAddress>'+escXml(e.trim())+'</t:EmailAddress></t:Mailbox>').join('')+'</t:BccRecipients>';
+      return '<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types" xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"><soap:Header><t:RequestServerVersion Version="Exchange2013" /></soap:Header><soap:Body><m:CreateItem MessageDisposition="SendAndSaveCopy"><m:Items><t:Message><t:Subject>'+escXml(subject)+'</t:Subject><t:Body BodyType="HTML"><![CDATA['+htmlBody+']]></t:Body>'+(importance?'<t:Importance>High</t:Importance>':'')+(readReceipt?'<t:IsReadReceiptRequested>true</t:IsReadReceiptRequested>':'')+'<t:ToRecipients><t:Mailbox><t:EmailAddress>'+escXml(to)+'</t:EmailAddress></t:Mailbox></t:ToRecipients>'+ccXml+bccXml+'</t:Message></m:Items></m:CreateItem></soap:Body></soap:Envelope>';
+    }
+
+    // ── UTILITIES ──
+    function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+    function fakeSend(ms){return new Promise(r=>setTimeout(r,ms))}
+    function logMsg(c,tag,msg,type){const d=document.createElement('div');d.className='log-'+type;d.textContent='['+tag+'] '+msg;c.appendChild(d);c.scrollTop=c.scrollHeight}
+    function escHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+    function escXml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;')}
+    function resetAll(){data=[];columns=[];previewIdx=0;document.getElementById('dataLoaded').style.display='none';uploadZone.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg><p>Drop a file here or click to browse</p><span class="hint">CSV, XLSX, XLS, TSV</span>';document.getElementById('subjectLine').value='';quill.setText('');document.getElementById('htmlSource').value='';goToStep(1)}
+  </script>
+</body>
+</html>
