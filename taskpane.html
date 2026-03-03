@@ -248,7 +248,7 @@
     <div class="panel" id="panel-4">
       <div class="card">
         <div class="card-title">Send Mail Merge</div>
-        <div class="alert alert-warning" id="sendWarning">This sends individual emails to each recipient. Review your preview before proceeding.</div>
+        <div class="alert alert-warning" id="sendWarning">Each email opens as a compose window in Outlook. Review each one and click Send. For large lists, increase the delay between opens.</div>
         <div id="preSend">
           <div id="finalSummary" style="font-size:13px;margin-bottom:12px"></div>
           <div class="checkbox-row">
@@ -440,19 +440,14 @@
 
     function sendViaOutlook(to,subject,htmlBody,cc,bcc,importance,readReceipt){
       return new Promise((resolve,reject)=>{
-        const soap=buildSoap(to,subject,htmlBody,cc,bcc,importance,readReceipt);
-        Office.context.mailbox.makeEwsRequestAsync(soap,result=>{
-          if(result.status===Office.AsyncResultStatus.Succeeded)resolve();
-          else reject(new Error(result.error.message||'EWS failed'));
-        });
+        try{
+          var params={toRecipients:[to],subject:subject,htmlBody:htmlBody};
+          if(cc){params.ccRecipients=cc.split(/[,;]/).map(function(e){return e.trim()}).filter(Boolean)}
+          if(bcc){params.bccRecipients=bcc.split(/[,;]/).map(function(e){return e.trim()}).filter(Boolean)}
+          Office.context.mailbox.displayNewMessageForm(params);
+          setTimeout(resolve,500);
+        }catch(err){reject(err)}
       });
-    }
-
-    function buildSoap(to,subject,htmlBody,cc,bcc,importance,readReceipt){
-      let ccXml='',bccXml='';
-      if(cc)ccXml='<t:CcRecipients>'+cc.split(/[,;]/).map(e=>'<t:Mailbox><t:EmailAddress>'+escXml(e.trim())+'</t:EmailAddress></t:Mailbox>').join('')+'</t:CcRecipients>';
-      if(bcc)bccXml='<t:BccRecipients>'+bcc.split(/[,;]/).map(e=>'<t:Mailbox><t:EmailAddress>'+escXml(e.trim())+'</t:EmailAddress></t:Mailbox>').join('')+'</t:BccRecipients>';
-      return '<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types" xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages"><soap:Header><t:RequestServerVersion Version="Exchange2013" /></soap:Header><soap:Body><m:CreateItem MessageDisposition="SendAndSaveCopy"><m:Items><t:Message><t:Subject>'+escXml(subject)+'</t:Subject><t:Body BodyType="HTML"><![CDATA['+htmlBody+']]></t:Body>'+(importance?'<t:Importance>High</t:Importance>':'')+(readReceipt?'<t:IsReadReceiptRequested>true</t:IsReadReceiptRequested>':'')+'<t:ToRecipients><t:Mailbox><t:EmailAddress>'+escXml(to)+'</t:EmailAddress></t:Mailbox></t:ToRecipients>'+ccXml+bccXml+'</t:Message></m:Items></m:CreateItem></soap:Body></soap:Envelope>';
     }
 
     // ── UTILITIES ──
