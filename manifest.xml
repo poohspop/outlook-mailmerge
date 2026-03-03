@@ -7,20 +7,20 @@
 
   <Id>a1b2c3d4-e5f6-7890-abcd-ef1234567890</Id>
   <Version>1.0.0.0</Version>
-  <ProviderName>YOURGHUSER</ProviderName>
+  <ProviderName>poohspop</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Mail Merge" />
   <Description DefaultValue="Mail merge directly in Outlook." />
-  <IconUrl DefaultValue="https://YOURGHUSER.github.io/outlook-mailmerge/assets/icon-32.png" />
-  <HighResolutionIconUrl DefaultValue="https://YOURGHUSER.github.io/outlook-mailmerge/assets/icon-64.png" />
-  <SupportUrl DefaultValue="https://YOURGHUSER.github.io/outlook-mailmerge/" />
-  <AppDomains><AppDomain>https://YOURGHUSER.github.io</AppDomain></AppDomains>
+  <IconUrl DefaultValue="https://poohspop.github.io/outlook-mailmerge/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://poohspop.github.io/outlook-mailmerge/assets/icon-64.png" />
+  <SupportUrl DefaultValue="https://poohspop.github.io/outlook-mailmerge/" />
+  <AppDomains><AppDomain>https://poohspop.github.io</AppDomain></AppDomains>
   <Hosts><Host Name="Mailbox" /></Hosts>
   <Requirements><Sets><Set Name="Mailbox" MinVersion="1.1" /></Sets></Requirements>
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
-        <SourceLocation DefaultValue="https://YOURGHUSER.github.io/outlook-mailmerge/taskpane.html" />
+        <SourceLocation DefaultValue="https://poohspop.github.io/outlook-mailmerge/taskpane.html" />
         <RequestedHeight>450</RequestedHeight>
       </DesktopSettings>
     </Form>
@@ -66,13 +66,13 @@
     </DesktopFormFactor></Host></Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="icon16" DefaultValue="https://YOURGHUSER.github.io/outlook-mailmerge/assets/icon-16.png" />
-        <bt:Image id="icon32" DefaultValue="https://YOURGHUSER.github.io/outlook-mailmerge/assets/icon-32.png" />
-        <bt:Image id="icon80" DefaultValue="https://YOURGHUSER.github.io/outlook-mailmerge/assets/icon-80.png" />
+        <bt:Image id="icon16" DefaultValue="https://poohspop.github.io/outlook-mailmerge/assets/icon-16.png" />
+        <bt:Image id="icon32" DefaultValue="https://poohspop.github.io/outlook-mailmerge/assets/icon-32.png" />
+        <bt:Image id="icon80" DefaultValue="https://poohspop.github.io/outlook-mailmerge/assets/icon-80.png" />
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="taskpaneUrl" DefaultValue="https://YOURGHUSER.github.io/outlook-mailmerge/taskpane.html" />
-        <bt:Url id="functionFile" DefaultValue="https://YOURGHUSER.github.io/outlook-mailmerge/taskpane.html" />
+        <bt:Url id="taskpaneUrl" DefaultValue="https://poohspop.github.io/outlook-mailmerge/taskpane.html" />
+        <bt:Url id="functionFile" DefaultValue="https://poohspop.github.io/outlook-mailmerge/taskpane.html" />
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="groupLabel" DefaultValue="Mail Merge" />
