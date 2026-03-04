@@ -248,7 +248,7 @@
     <div class="panel" id="panel-4">
       <div class="card">
         <div class="card-title">Send Mail Merge</div>
-        <div class="alert alert-warning" id="sendWarning">Each email opens as a compose window in Outlook. Review each one and click Send. For large lists, increase the delay between opens.</div>
+        <div class="alert alert-warning" id="sendWarning">Emails send directly from your Outlook account via Exchange Web Services. Full HTML formatting is preserved.</div>
         <div id="preSend">
           <div id="finalSummary" style="font-size:13px;margin-bottom:12px"></div>
           <div class="checkbox-row">
@@ -283,7 +283,7 @@
     // ── STATE ──
     let currentStep=1,data=[],columns=[],previewIdx=0,quill=null,editorMode='visual',isSending=false,isOfficeReady=false;
 
-    if(typeof Office!=='undefined'){Office.onReady(function(info){isOfficeReady=true;console.log('Office.js ready:',info.host);document.getElementById('statusText').textContent='Connected to '+info.host+' | API: '+(Office.context.mailbox.displayNewMessageFormAsync?'1.9+':Office.context.mailbox.displayNewMessageForm?'1.6+':'basic')})}
+    if(typeof Office!=='undefined'){Office.onReady(function(info){isOfficeReady=true;console.log('Office.js ready:',info.host)})}
 
     // ── STEP NAVIGATION ──
     function goToStep(n){
@@ -440,34 +440,80 @@
 
     function sendViaOutlook(to,subject,htmlBody,cc,bcc,importance,readReceipt){
       return new Promise(function(resolve,reject){
-        // Try displayNewMessageFormAsync first (Mailbox 1.9+)
-        if(Office.context.mailbox.displayNewMessageFormAsync){
-          var params={toRecipients:[to],subject:subject,htmlBody:htmlBody};
-          if(cc)params.ccRecipients=cc.split(/[,;]/).map(function(e){return e.trim()}).filter(Boolean);
-          if(bcc)params.bccRecipients=bcc.split(/[,;]/).map(function(e){return e.trim()}).filter(Boolean);
-          Office.context.mailbox.displayNewMessageFormAsync(params,function(result){
-            if(result.status===Office.AsyncResultStatus.Failed){reject(new Error(result.error.message))}
-            else{setTimeout(resolve,300)}
-          });
-        }
-        // Try displayNewMessageForm (Mailbox 1.6+)
-        else if(Office.context.mailbox.displayNewMessageForm){
-          var params2={toRecipients:[to],subject:subject,htmlBody:htmlBody};
-          if(cc)params2.ccRecipients=cc.split(/[,;]/).map(function(e){return e.trim()}).filter(Boolean);
-          if(bcc)params2.bccRecipients=bcc.split(/[,;]/).map(function(e){return e.trim()}).filter(Boolean);
-          Office.context.mailbox.displayNewMessageForm(params2);
-          setTimeout(resolve,500);
-        }
-        // Fallback: open mailto link
-        else{
-          var mailto='mailto:'+encodeURIComponent(to)+'?subject='+encodeURIComponent(subject);
-          if(cc)mailto+='&cc='+encodeURIComponent(cc);
-          if(bcc)mailto+='&bcc='+encodeURIComponent(bcc);
-          mailto+='&body='+encodeURIComponent(htmlBody.replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim());
-          window.open(mailto,'_blank');
-          setTimeout(resolve,500);
+        // Get EWS URL and callback token, then send via direct EWS HTTPS request
+        var ewsUrl=Office.context.mailbox.ewsUrl;
+        if(!ewsUrl){reject(new Error('EWS URL not available'));return}
+
+        Office.context.mailbox.getCallbackTokenAsync({isRest:false},function(tokenResult){
+          if(tokenResult.status!==Office.AsyncResultStatus.Succeeded){
+            // Fallback: try makeEwsRequestAsync directly
+            sendViaMakeEws(to,subject,htmlBody,cc,bcc,importance,readReceipt,resolve,reject);
+            return;
+          }
+          var token=tokenResult.value;
+          var soap=buildCreateItemSoap(to,subject,htmlBody,cc,bcc,importance,readReceipt);
+
+          var xhr=new XMLHttpRequest();
+          xhr.open('POST',ewsUrl,true);
+          xhr.setRequestHeader('Content-Type','text/xml; charset=utf-8');
+          xhr.setRequestHeader('Authorization','Bearer '+token);
+          xhr.onload=function(){
+            if(xhr.status===200&&xhr.responseText.indexOf('NoError')!==-1){resolve()}
+            else if(xhr.status===200&&xhr.responseText.indexOf('ErrorMessageSend')!==-1){reject(new Error('Exchange rejected the message'))}
+            else{reject(new Error('EWS HTTP '+xhr.status))}
+          };
+          xhr.onerror=function(){
+            // Fallback to makeEwsRequestAsync
+            sendViaMakeEws(to,subject,htmlBody,cc,bcc,importance,readReceipt,resolve,reject);
+          };
+          xhr.send(soap);
+        });
+      });
+    }
+
+    function sendViaMakeEws(to,subject,htmlBody,cc,bcc,importance,readReceipt,resolve,reject){
+      var soap=buildCreateItemSoap(to,subject,htmlBody,cc,bcc,importance,readReceipt);
+      Office.context.mailbox.makeEwsRequestAsync(soap,function(result){
+        if(result.status===Office.AsyncResultStatus.Succeeded){
+          if(result.value.indexOf('NoError')!==-1){resolve()}
+          else{reject(new Error('EWS error in response'))}
+        }else{
+          reject(new Error(result.error?result.error.message:'makeEwsRequestAsync failed'));
         }
       });
+    }
+
+    function buildCreateItemSoap(to,subject,htmlBody,cc,bcc,importance,readReceipt){
+      var toXml='<t:ToRecipients><t:Mailbox><t:EmailAddress>'+escXml(to)+'</t:EmailAddress></t:Mailbox></t:ToRecipients>';
+      var ccXml='';
+      if(cc){
+        var ccAddrs=cc.split(/[,;]/).map(function(e){return e.trim()}).filter(Boolean);
+        if(ccAddrs.length){ccXml='<t:CcRecipients>'+ccAddrs.map(function(e){return '<t:Mailbox><t:EmailAddress>'+escXml(e)+'</t:EmailAddress></t:Mailbox>'}).join('')+'</t:CcRecipients>'}
+      }
+      var bccXml='';
+      if(bcc){
+        var bccAddrs=bcc.split(/[,;]/).map(function(e){return e.trim()}).filter(Boolean);
+        if(bccAddrs.length){bccXml='<t:BccRecipients>'+bccAddrs.map(function(e){return '<t:Mailbox><t:EmailAddress>'+escXml(e)+'</t:EmailAddress></t:Mailbox>'}).join('')+'</t:BccRecipients>'}
+      }
+      var bodyEsc=htmlBody.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+      return '<?xml version="1.0" encoding="utf-8"?>'+
+        '<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages" xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">'+
+        '<soap:Header><t:RequestServerVersion Version="Exchange2013" /></soap:Header>'+
+        '<soap:Body>'+
+        '<m:CreateItem MessageDisposition="SendAndSaveCopy">'+
+        '<m:Items>'+
+        '<t:Message>'+
+        '<t:Subject>'+escXml(subject)+'</t:Subject>'+
+        '<t:Body BodyType="HTML">'+bodyEsc+'</t:Body>'+
+        (importance?'<t:Importance>High</t:Importance>':'')+
+        (readReceipt?'<t:IsReadReceiptRequested>true</t:IsReadReceiptRequested>':'')+
+        toXml+ccXml+bccXml+
+        '</t:Message>'+
+        '</m:Items>'+
+        '</m:CreateItem>'+
+        '</soap:Body>'+
+        '</soap:Envelope>';
     }
 
     // ── UTILITIES ──
